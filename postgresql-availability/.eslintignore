@@ -1,0 +1,22 @@
+/node_modules/*
+**/node_modules 
+# build artifacts
+dist/*coverage/*
+dist/*
+lib/*
+
+/**/dist/*
+**/dist 
+
+# data definition files
+**/*.d.ts
+
+# custom definition files
+/src/types/
+
+!.eslintrc.js
+
+e2e/*
+
+# packages/hermes/src/*
+# packages/hermes-mongodb/src/*

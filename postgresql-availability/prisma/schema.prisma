@@ -1,0 +1,19 @@
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://test:test@localhost:5432/test?schema=public"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model TimeSlot {
+  id          Int      @id @default(autoincrement())
+  requesterId String
+  resourceId  Int
+  startTime   DateTime
+  endTime     DateTime
+
+  @@unique([resourceId, startTime], name: "resourceId_startTime_idx")
+  @@index(fields: [resourceId])
+}
