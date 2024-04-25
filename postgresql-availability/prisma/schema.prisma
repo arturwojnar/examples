@@ -17,3 +17,13 @@ model TimeSlot {
   @@unique([resourceId, startTime], name: "resourceId_startTime_idx")
   @@index(fields: [resourceId])
 }
+
+model TimeSlot2 {
+  id          Int      @id @default(autoincrement())
+  requesterId String
+  resourceId  Int
+  startTime   DateTime
+  endTime     DateTime
+
+  @@index(fields: [resourceId])
+}
