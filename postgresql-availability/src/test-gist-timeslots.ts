@@ -1,37 +1,25 @@
 import { PrismaClient } from '@prisma/client'
 import dayjs from 'dayjs'
-import { TimeAvailability, TimeSlotRepository } from './timeslots.js'
+import { TimeAvailability } from './gist-timeslots.js'
 import { avg } from './utils.js'
 
 const firstDate = new Date('2024-05-01 10:00:00')
-const resourceId = 100
 const requesterId = `sabina`
+const prisma = new PrismaClient()
 
 export const populateTimeSlots = async () => {
-  const prisma = new PrismaClient()
-  const TO_MINUTES = 60000
   const requesterId = `artur`
 
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 600; i++) {
     const from = dayjs(firstDate)
       .add(i * 10, 'days')
       .toDate()
-    const timeSlotSize = 15
 
     for (let resourceId = 1; resourceId < 1000; resourceId++) {
-      await prisma.timeSlot.createMany({
-        data: Array(500)
-          .fill(0)
-          .map((_, i) => {
-            const startTime = new Date(from.getTime() + i * timeSlotSize * TO_MINUTES)
-            return {
-              resourceId,
-              requesterId,
-              startTime,
-              endTime: new Date(startTime.getTime() + timeSlotSize * TO_MINUTES),
-            }
-          }),
-      })
+      const to = dayjs(from).add(7500, 'minutes').toDate()
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "timeslot3" (requesterId, resourceId, date_range) VALUES ('${requesterId}', ${resourceId}, daterange('${from.toISOString()}', '${to.toISOString()}', '[]'))
+      `)
     }
   }
 }
@@ -40,7 +28,7 @@ export const test = async () => {
   try {
     // await populateTimeSlots()
     const results1 = new Array<number>(30)
-    const results2 = new Array<number>(5)
+    const results2 = new Array<number>(30)
 
     for (let i = 0; i < results1.length; i++) {
       const from = dayjs(firstDate).add(i * 10, 'days')
@@ -48,7 +36,6 @@ export const test = async () => {
       const start = performance.now()
       try {
         await saveAvailability(from.toDate(), to.toDate())
-        throw new Error(`Conflict. It should've not happened`)
       } catch {
         //
       }
@@ -72,8 +59,10 @@ export const test = async () => {
 }
 
 const saveAvailability = async (from: Date, to: Date) => {
-  const repo = new TimeSlotRepository()
   const availability = new TimeAvailability(100)
-  const timeslots = await availability.Lock(requesterId, from, to)
-  await repo.createMany(timeslots)
+  const aggregate = availability.Lock(requesterId, from, to)
+
+  await prisma.$executeRawUnsafe(`
+    INSERT INTO "timeslot3" (requesterId, resourceId, date_range) VALUES ('${requesterId}', ${aggregate.resourceId}, daterange('${from.toISOString()}', '${to.toISOString()}', '[]'))
+  `)
 }

@@ -1,10 +1,10 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = "postgresql://test:test@localhost:5432/test?schema=public"
-}
-
-generator client {
-  provider = "prisma-client-js"
 }
 
 model TimeSlot {
@@ -15,7 +15,7 @@ model TimeSlot {
   endTime     DateTime
 
   @@unique([resourceId, startTime], name: "resourceId_startTime_idx")
-  @@index(fields: [resourceId])
+  @@index([resourceId])
 }
 
 model TimeSlot2 {
@@ -25,5 +25,13 @@ model TimeSlot2 {
   startTime   DateTime
   endTime     DateTime
 
-  @@index(fields: [resourceId])
+  @@index([resourceId])
+}
+
+/// This table contains exclusion constraints and requires additional setup for migrations. Visit https://pris.ly/d/exclusion-constraints for more info.
+model timeslot3 {
+  id          Int                       @id @default(autoincrement())
+  requesterid String?
+  resourceid  Int?
+  date_range  Unsupported("daterange")?
 }

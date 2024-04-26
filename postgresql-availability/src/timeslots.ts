@@ -4,7 +4,6 @@ const prisma = new PrismaClient()
 
 /* ---------- TimeSlot ---------- */
 import dayjs from 'dayjs'
-import { start } from 'repl'
 
 export class TimeSlot {
   constructor(
@@ -92,30 +91,4 @@ export class TimeAvailability {
         return new TimeSlot(startTime, endTime, this.resourceId, requesterId)
       })
   }
-
-  // async Unlock(requesterId: string, from: Date, to: Date): Promise<void> {
-  //   const slotsToDelete = this.timeSlots.filter(
-  //     (slot) => slot.isOverlapping(from, to) && slot.canBeUnlockedBy(requesterId),
-  //   )
-
-  //   if (slotsToDelete.length === 0) {
-  //     throw new Error('No slots found that can be unlocked by this requester.')
-  //   }
-
-  //   // Extract timeSlotIds for deletion
-  //   const timeSlotIdsToDelete = slotsToDelete.map((slot) => slot.id)
-
-  //   try {
-  //     await prisma.timeSlot.deleteMany({
-  //       where: {
-  //         id: {
-  //           in: timeSlotIdsToDelete,
-  //         },
-  //       },
-  //     })
-  //   } catch (error) {
-  //     // Handle or log the error as needed
-  //     throw new Error('Failed to unlock the slots.')
-  //   }
-  // }
 }
