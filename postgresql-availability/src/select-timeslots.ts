@@ -31,14 +31,15 @@ export class TimeSlotRepository {
         `
         SELECT 1
         FROM "TimeSlot2" t
-        WHERE "t"."startTime" < '${to.toISOString()}'
+        WHERE "t"."resourceId"=${resourceId}
+          AND "t"."startTime" < '${to.toISOString()}'
           AND "t"."endTime" > '${from.toISOString()}'
         LIMIT 1
         FOR UPDATE;
         `,
       )
       if (result > 0) {
-        throw new Error('No slots found that can be unlocked by this requester.')
+        throw new Error('Overlapping error.')
       }
       return await prisma.timeSlot2.create({
         data: {

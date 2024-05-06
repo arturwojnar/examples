@@ -24,38 +24,36 @@ export const populateTimeSlots = async () => {
   }
 }
 
-export const test = async () => {
-  try {
-    // await populateTimeSlots()
-    const results1 = new Array<number>(30)
-    const results2 = new Array<number>(30)
+export const test = async (startDate: Date) => {
+  // await populateTimeSlots()
+  const results1 = new Array<number>(30)
+  const results2 = new Array<number>(30)
 
-    for (let i = 0; i < results1.length; i++) {
-      const from = dayjs(firstDate).add(i * 10, 'days')
-      const to = from.add(1, 'day')
-      const start = performance.now()
-      try {
-        await saveAvailability(from.toDate(), to.toDate())
-      } catch {
-        //
-      }
-      results1[i] = performance.now() - start
-    }
-
-    console.info(`Average for conflicts is ${avg(results1)} ms`)
-
-    for (let i = 0; i < results2.length; i++) {
-      const from = dayjs(firstDate).add(i * 10 + 6, 'days')
-      const to = from.add(1, 'day')
-      const start = performance.now()
+  for (let i = 0; i < results1.length; i++) {
+    const from = dayjs(startDate).add(i * 30, 'days')
+    const to = from.add(1, 'day')
+    const start = performance.now()
+    try {
       await saveAvailability(from.toDate(), to.toDate())
-      results2[i] = performance.now() - start
+    } catch {
+      //
     }
-
-    console.info(`Average for inserts is ${avg(results2)} ms`)
-  } catch (error) {
-    console.error(error)
+    results1[i] = performance.now() - start
   }
+
+  console.info(`Average for conflicts is ${avg(results1)} ms`)
+
+  for (let i = 0; i < results2.length; i++) {
+    const from = dayjs(startDate).add(i * 30 + 6, 'days')
+    const to = from.add(1, 'day')
+    const start = performance.now()
+    await saveAvailability(from.toDate(), to.toDate())
+    results2[i] = performance.now() - start
+  }
+
+  console.info(`Average for inserts is ${avg(results2)} ms`)
+
+  return [avg(results1), avg(results2)]
 }
 
 const saveAvailability = async (from: Date, to: Date) => {
