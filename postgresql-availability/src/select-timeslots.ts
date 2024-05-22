@@ -12,6 +12,7 @@ export class TimeSlot {
     public endTime: Date,
     public requesterId: string,
     public id?: number,
+    public deleted = false,
   ) {}
 
   isOverlapping(from: Date, to: Date): boolean {
@@ -30,14 +31,17 @@ export class TimeSlot {
       resourceId: this.resourceId,
       requesterId: this.requesterId,
       id: this.id,
+      deleted: this.deleted,
     }
   }
 }
 
 /* ---------- TimeSlotRepository ---------- */
 export class TimeSlotRepository {
+  constructor(private _prisma = prisma) {}
+
   async create({ requesterId, resourceId, startTime: from, endTime: to }: TimeSlot) {
-    await prisma.$transaction(async (prisma) => {
+    await this._prisma.$transaction(async (prisma) => {
       return await prisma.$executeRawUnsafe(
         `
         DO $$
@@ -68,16 +72,16 @@ export class TimeSlotRepository {
   }
 
   async find(resourceId: number): Promise<TimeSlot[]> {
-    const prismaTimeSlots = await prisma.timeSlot2.findMany({
+    const prismaTimeSlots = await this._prisma.timeSlot2.findMany({
       where: { resourceId },
     })
     return prismaTimeSlots.map(
-      (slot) => new TimeSlot(slot.resourceId, slot.startTime, slot.endTime, slot.requesterId, slot.id),
+      (slot) => new TimeSlot(slot.resourceId, slot.startTime, slot.endTime, slot.requesterId, slot.id, slot.deleted),
     )
   }
 
   async unlock(resourceId: number, requesterId: string) {
-    return await prisma.timeSlot2.updateMany({
+    return await this._prisma.timeSlot2.updateMany({
       where: {
         requesterId,
         resourceId,

@@ -29,11 +29,15 @@ CREATE TABLE "timeslot3" (
     "requesterid" TEXT,
     "resourceid" INTEGER,
     "date_range" daterange,
-    "locked" BOOLEAN,
+    "deleted" BOOLEAN,
     CONSTRAINT "timeslot3_pkey" PRIMARY KEY ("id")
 );
 ALTER TABLE "timeslot3"
-ADD CONSTRAINT "timeslot3_excl" EXCLUDE USING GIST ("resourceid" WITH =, "date_range" WITH &&);
+ADD CONSTRAINT "timeslot3_excl" EXCLUDE USING GIST 
+(
+    "resourceid" WITH =, 
+    "date_range" WITH && 
+) WHERE ("deleted" IS FALSE);
 
 -- CreateTable
 CREATE TABLE "v_count" (

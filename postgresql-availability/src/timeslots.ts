@@ -33,6 +33,7 @@ export class TimeSlot {
       resourceId: this.resourceId,
       requesterId: this.requesterId,
       id: this.id,
+      locked: this.locked,
     }
   }
 }

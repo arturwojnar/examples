@@ -27,7 +27,7 @@ model TimeSlot2 {
   resourceId  Int
   startTime   DateTime
   endTime     DateTime
-  deleted     Boolean  @default(true)
+  deleted     Boolean  @default(false)
 
   @@index([resourceId, requesterId])
   @@index([resourceId])
@@ -39,7 +39,7 @@ model timeslot3 {
   requesterid String?
   resourceid  Int?
   date_range  Unsupported("daterange")?
-  locked      Boolean?
+  deleted      Boolean? @default(false)
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
