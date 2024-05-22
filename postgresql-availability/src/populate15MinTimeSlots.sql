@@ -24,7 +24,7 @@ BEGIN
         end_time := start_time + interval '15 minutes';
 
         -- Insert the record into the TimeSlot table
-        INSERT INTO TimeSlot (requesterId, resourceId, startTime, endTime)
+        INSERT INTO "TimeSlot" ("requesterId", "resourceId", "startTime", "endTime")
         VALUES ('artur', j, start_time, end_time);
       END LOOP;
     END LOOP;

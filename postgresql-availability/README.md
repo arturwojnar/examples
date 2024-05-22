@@ -37,6 +37,7 @@ CREATE TABLE TimeSlot3(
 	requesterId text,
 	resourceId  integer,
 	date_range daterange,
+	locked boolean,
 	EXCLUDE USING GIST (resourceId WITH =, date_range WITH &&)
 );
 ```

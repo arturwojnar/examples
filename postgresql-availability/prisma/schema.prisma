@@ -4,7 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://test:test@localhost:5432/test?schema=public"
+  url      = env("DATABASE_URL")
+  // url      = "postgresql://test:test@localhost:5432/test?schema=public"
 }
 
 model TimeSlot {
@@ -13,8 +14,10 @@ model TimeSlot {
   resourceId  Int
   startTime   DateTime
   endTime     DateTime
+  locked      Boolean  @default(true)
 
   @@unique([resourceId, startTime], name: "resourceId_startTime_idx")
+  @@index([resourceId, requesterId])
   @@index([resourceId])
 }
 
@@ -24,7 +27,9 @@ model TimeSlot2 {
   resourceId  Int
   startTime   DateTime
   endTime     DateTime
+  deleted     Boolean  @default(true)
 
+  @@index([resourceId, requesterId])
   @@index([resourceId])
 }
 
@@ -34,4 +39,12 @@ model timeslot3 {
   requesterid String?
   resourceid  Int?
   date_range  Unsupported("daterange")?
+  locked      Boolean?
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model v_count {
+  count Int?
+
+  @@ignore
 }

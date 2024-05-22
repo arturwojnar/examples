@@ -3,7 +3,7 @@ import dayjs from 'dayjs'
 import { TimeAvailability, TimeSlotRepository } from './timeslots.js'
 import { avg } from './utils.js'
 
-const firstDate = new Date('2024-05-01 10:00:00')
+const initialDate = new Date('2024-05-01 10:00:00')
 const requesterId = `sabina`
 
 export const populateTimeSlots = async () => {
@@ -12,7 +12,7 @@ export const populateTimeSlots = async () => {
   const requesterId = `artur`
 
   for (let i = 0; i < 100; i++) {
-    const from = dayjs(firstDate)
+    const from = dayjs(initialDate)
       .add(i * 30, 'days')
       .toDate()
     const timeSlotSize = 15
@@ -36,7 +36,6 @@ export const populateTimeSlots = async () => {
 }
 
 export const test = async (startDate: Date): Promise<[number, number]> => {
-  // await populateTimeSlots()
   const results1 = new Array<number>(30)
   const results2 = new Array<number>(30)
 
@@ -68,9 +67,44 @@ export const test = async (startDate: Date): Promise<[number, number]> => {
   return [avg(results1), avg(results2)]
 }
 
-const saveAvailability = async (from: Date, to: Date) => {
+export const testUnlocking = async (): Promise<[number, number]> => {
+  const resourceIds = Array(30)
+    .fill(0)
+    .map((_, i) => i + 9950)
+  const results1 = new Array<number>(30)
+  const results2 = new Array<number>(30)
+
+  for (let i = 0; i < results1.length; i++) {
+    const start = performance.now()
+
+    await removeAvailability(resourceIds[i], `artur`)
+
+    results1[i] = performance.now() - start
+  }
+
+  console.info(`Average for unlocking is ${avg(results1)} ms`)
+
+  for (let i = 0; i < results2.length; i++) {
+    const from = dayjs(initialDate).add(i * 30, 'days')
+    const to = from.add(1, 'day')
+    const start = performance.now()
+    await saveAvailability(from.toDate(), to.toDate(), resourceIds[i])
+    results2[i] = performance.now() - start
+  }
+
+  console.info(`Average for relocking is ${avg(results2)} ms`)
+
+  return [avg(results1), avg(results2)]
+}
+
+const saveAvailability = async (from: Date, to: Date, resourceId = 100) => {
   const repo = new TimeSlotRepository()
-  const availability = new TimeAvailability(100)
-  const timeslots = await availability.Lock(requesterId, from, to)
+  const availability = new TimeAvailability(resourceId)
+  const timeslots = await availability.lock(requesterId, from, to)
   await repo.createMany(timeslots)
+}
+
+const removeAvailability = async (resourceId: number, requesterId: string) => {
+  const repo = new TimeSlotRepository()
+  await repo.unlock(resourceId, requesterId)
 }

@@ -23,6 +23,24 @@
       ],
       "program": "postgresql-availability/dist/index.js",
       "runtimeArgs": ["--experimental-modules"]
+    },
+    {
+      "args": [
+        "-c",
+        "${workspaceFolder}/postgresql-availability/jest.config.js",
+        "--maxConcurrency=1",
+        "--runInBand",
+        "--detectOpenHandles",
+        "--colors",
+        "--verbose"
+      ],
+      "internalConsoleOptions": "neverOpen",
+      "console": "integratedTerminal",
+      "name": "test",
+      "program": "${workspaceRoot}/postgresql-availability/node_modules/.bin/jest",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "type": "node"
     }
   ]
 }

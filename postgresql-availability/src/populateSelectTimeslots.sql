@@ -18,8 +18,8 @@ BEGIN
       end_time := from_date + interval '30 hours';
 
       -- Insert the record into the TimeSlot table
-      INSERT INTO "TimeSlot2" ("requesterId", "resourceId", "startTime", "endTime")
-      VALUES ('artur', j, start_time, end_time);
+      INSERT INTO "TimeSlot2" ("requesterId", "resourceId", "startTime", "endTime", "deleted")
+      VALUES ('artur', j, start_time, end_time, False);
     END LOOP;
   END LOOP;
 END;

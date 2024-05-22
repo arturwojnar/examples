@@ -1,9 +1,11 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
+import pLimit from 'p-limit'
 
 const prisma = new PrismaClient()
 
 /* ---------- TimeSlot ---------- */
 import dayjs from 'dayjs'
+import { DefaultArgs } from '@prisma/client/runtime/library'
 
 export class TimeSlot {
   constructor(
@@ -12,6 +14,7 @@ export class TimeSlot {
     public resourceId: number,
     public requesterId: string,
     public id?: number,
+    public locked: boolean = true,
   ) {}
 
   isOverlapping(from: Date, to: Date): boolean {
@@ -22,44 +25,77 @@ export class TimeSlot {
   canBeUnlockedBy(requesterId: string): boolean {
     return this.requesterId === requesterId
   }
+
+  getData() {
+    return {
+      startTime: this.startTime,
+      endTime: this.endTime,
+      resourceId: this.resourceId,
+      requesterId: this.requesterId,
+      id: this.id,
+    }
+  }
 }
 
 /* ---------- TimeSlotRepository ---------- */
 export class TimeSlotRepository {
-  async create(requesterId: string, resourceId: number, from: Date, to: Date) {
-    return await prisma.timeSlot.create({
-      data: {
-        requesterId,
-        resourceId,
-        startTime: from,
-        endTime: to,
-      },
-    })
+  constructor(private _prisma = prisma) {}
+
+  async create(
+    slot: TimeSlot,
+    tx: Omit<
+      PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
+      '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+    > = this._prisma,
+  ) {
+    return await tx.$queryRawUnsafe(`
+      DO $$
+      DECLARE
+          v_locked BOOLEAN;
+      BEGIN
+          INSERT INTO "TimeSlot" ("requesterId", "resourceId", "startTime", "endTime", "locked")
+          VALUES ('${slot.requesterId}', ${slot.resourceId}, '${slot.startTime.toISOString()}', '${slot.endTime.toISOString()}', True)
+          ON CONFLICT ("resourceId", "startTime")
+          DO UPDATE SET "startTime" = EXCLUDED."startTime",
+              "endTime" = EXCLUDED."endTime",
+              "requesterId" = EXCLUDED."requesterId",
+              "locked"=True
+          WHERE "TimeSlot"."locked"=False
+          RETURNING "TimeSlot"."locked" INTO v_locked;
+      
+          IF NOT FOUND THEN
+              RAISE EXCEPTION 'CONFLICT';
+          END IF;
+      
+      END $$;
+    `)
   }
 
   async createMany(slots: TimeSlot[]) {
-    return await prisma.timeSlot.createMany({
-      data: slots.map((slot) => ({
-        requesterId: slot.requesterId,
-        resourceId: slot.resourceId,
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-      })),
+    return await this._prisma.$transaction(async (tx) => {
+      const limit = pLimit(10)
+      return await Promise.all(slots.map((slot) => limit(() => this.create(slot, tx))))
+    })
+  }
+
+  async unlock(resourceId: number, requesterId: string) {
+    return await this._prisma.timeSlot.updateMany({
+      where: {
+        resourceId,
+        requesterId,
+      },
+      data: {
+        locked: false,
+      },
     })
   }
 
   async find(resourceId: number): Promise<TimeSlot[]> {
-    const prismaTimeSlots = await prisma.timeSlot.findMany({
+    const prismaTimeSlots = await this._prisma.timeSlot.findMany({
       where: { resourceId },
-      select: {
-        id: true,
-        startTime: true,
-        endTime: true,
-        requesterId: true,
-      },
     })
     return prismaTimeSlots.map(
-      (slot) => new TimeSlot(slot.startTime, slot.endTime, resourceId, slot.requesterId, slot.id),
+      (slot) => new TimeSlot(slot.startTime, slot.endTime, resourceId, slot.requesterId, slot.id, slot.locked),
     )
   }
 }
@@ -70,7 +106,7 @@ const TO_MINUTES = 60000
 export class TimeAvailability {
   constructor(private resourceId: number) {}
 
-  async Lock(requesterId: string, from: Date, to: Date, timeSlotSize = 15) {
+  async lock(requesterId: string, from: Date, to: Date, timeSlotSize = 15) {
     // Calculate slots required
     if ((from.getTime() / TO_MINUTES) % 15 !== 0) {
       throw new Error(`The date has to be a multiple of 15 minutes`)

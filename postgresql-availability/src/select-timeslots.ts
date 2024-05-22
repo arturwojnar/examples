@@ -7,10 +7,11 @@ import dayjs from 'dayjs'
 
 export class TimeSlot {
   constructor(
-    public id: number,
+    public resourceId: number,
     public startTime: Date,
     public endTime: Date,
-    private requesterId: string,
+    public requesterId: string,
+    public id?: number,
   ) {}
 
   isOverlapping(from: Date, to: Date): boolean {
@@ -21,48 +22,70 @@ export class TimeSlot {
   canBeUnlockedBy(requesterId: string): boolean {
     return this.requesterId === requesterId
   }
+
+  getData() {
+    return {
+      startTime: this.startTime,
+      endTime: this.endTime,
+      resourceId: this.resourceId,
+      requesterId: this.requesterId,
+      id: this.id,
+    }
+  }
 }
 
 /* ---------- TimeSlotRepository ---------- */
 export class TimeSlotRepository {
-  async create(requesterId: string, resourceId: number, from: Date, to: Date) {
+  async create({ requesterId, resourceId, startTime: from, endTime: to }: TimeSlot) {
     await prisma.$transaction(async (prisma) => {
-      const result = await prisma.$executeRawUnsafe(
+      return await prisma.$executeRawUnsafe(
         `
-        SELECT 1
-        FROM "TimeSlot2" t
-        WHERE "t"."resourceId"=${resourceId}
-          AND "t"."startTime" < '${to.toISOString()}'
-          AND "t"."endTime" > '${from.toISOString()}'
-        LIMIT 1
-        FOR UPDATE;
+        DO $$
+        DECLARE
+          v_count INTEGER;
+        BEGIN
+          SELECT 1 AS "count"
+          INTO v_count
+          FROM "TimeSlot2" t
+          WHERE "t"."resourceId"=${resourceId}
+            AND "t"."startTime" < '${to.toISOString()}'
+            AND "t"."endTime" > '${from.toISOString()}'
+            AND "t"."deleted"=False
+          LIMIT 1
+          FOR UPDATE;
+        
+          IF FOUND THEN
+            RAISE EXCEPTION 'CONFLICT';
+          END IF;
+        
+          INSERT INTO "TimeSlot2" ("requesterId", "resourceId", "startTime", "endTime", "deleted")
+          VALUES ('${requesterId}', ${resourceId}, '${from.toISOString()}', '${to.toISOString()}', False);
+        
+        END $$;
         `,
       )
-      if (result > 0) {
-        throw new Error('Overlapping error.')
-      }
-      return await prisma.timeSlot2.create({
-        data: {
-          requesterId,
-          resourceId,
-          startTime: from,
-          endTime: to,
-        },
-      })
     })
   }
 
   async find(resourceId: number): Promise<TimeSlot[]> {
     const prismaTimeSlots = await prisma.timeSlot2.findMany({
       where: { resourceId },
-      select: {
-        id: true,
-        startTime: true,
-        endTime: true,
-        requesterId: true,
+    })
+    return prismaTimeSlots.map(
+      (slot) => new TimeSlot(slot.resourceId, slot.startTime, slot.endTime, slot.requesterId, slot.id),
+    )
+  }
+
+  async unlock(resourceId: number, requesterId: string) {
+    return await prisma.timeSlot2.updateMany({
+      where: {
+        requesterId,
+        resourceId,
+      },
+      data: {
+        deleted: true,
       },
     })
-    return prismaTimeSlots.map((slot) => new TimeSlot(slot.id, slot.startTime, slot.endTime, slot.requesterId))
   }
 }
 
@@ -70,12 +93,7 @@ export class TimeSlotRepository {
 export class TimeAvailability {
   constructor(private resourceId: number) {}
 
-  async Lock(requesterId: string, from: Date, to: Date) {
-    return {
-      resourceId: this.resourceId,
-      requesterId,
-      startTime: from,
-      endTime: to,
-    }
+  async lock(requesterId: string, from: Date, to: Date) {
+    return new TimeSlot(this.resourceId, from, to, requesterId)
   }
 }

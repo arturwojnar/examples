@@ -17,6 +17,16 @@ export class TimeSlot {
   canBeUnlockedBy(requesterId: string): boolean {
     return this.requesterId === requesterId
   }
+
+  getData() {
+    return {
+      startTime: this.startTime,
+      endTime: this.endTime,
+      resourceId: this.resourceId,
+      requesterId: this.requesterId,
+      id: this.id,
+    }
+  }
 }
 
 /* ---------- TimeAvailability ---------- */
