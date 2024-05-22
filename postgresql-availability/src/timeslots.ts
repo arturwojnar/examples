@@ -71,11 +71,44 @@ export class TimeSlotRepository {
     `)
   }
 
-  async createMany(slots: TimeSlot[]) {
-    return await this._prisma.$transaction(async (tx) => {
-      const limit = pLimit(10)
-      return await Promise.all(slots.map((slot) => limit(() => this.create(slot, tx))))
-    })
+  async createMany(
+    slots: TimeSlot[],
+    tx: Omit<
+      PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
+      '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+    > = this._prisma,
+  ) {
+    const values: Array<[string, number, Date, Date]> = slots.map((slot) => [
+      slot.requesterId,
+      slot.resourceId,
+      slot.startTime,
+      slot.endTime,
+    ])
+
+    return await tx.$queryRawUnsafe(`
+      DO $$
+      DECLARE
+          slot JSONB;
+          v_locked BOOLEAN;
+      BEGIN
+          FOR slot IN SELECT * FROM jsonb_array_elements('${JSON.stringify(values)}'::jsonb)
+          LOOP
+              INSERT INTO "TimeSlot" ("requesterId", "resourceId", "startTime", "endTime", "locked")
+              VALUES (slot->>0, (slot->>1)::INTEGER, (slot->>2)::TIMESTAMPTZ, (slot->>3)::TIMESTAMPTZ, True)
+              ON CONFLICT ("resourceId", "startTime")
+              DO UPDATE SET "startTime" = EXCLUDED."startTime",
+                  "endTime" = EXCLUDED."endTime",
+                  "requesterId" = EXCLUDED."requesterId",
+                  "locked"=True
+              WHERE "TimeSlot"."locked"=False
+              RETURNING "TimeSlot"."locked" INTO v_locked;
+      
+              IF NOT FOUND THEN
+                  RAISE EXCEPTION 'CONFLICT';
+              END IF;
+          END LOOP;
+      END $$;
+    `)
   }
 
   async unlock(resourceId: number, requesterId: string) {
