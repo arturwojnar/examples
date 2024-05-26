@@ -1,5 +1,4 @@
 import { Prisma, PrismaClient } from '@prisma/client'
-import pLimit from 'p-limit'
 
 const prisma = new PrismaClient()
 
@@ -72,7 +71,7 @@ export class TimeSlotRepository {
     `)
   }
 
-  async createMany(
+  async lock(
     slots: TimeSlot[],
     tx: Omit<
       PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
@@ -112,16 +111,40 @@ export class TimeSlotRepository {
     `)
   }
 
-  async unlock(resourceId: number, requesterId: string) {
-    return await this._prisma.timeSlot.updateMany({
-      where: {
-        resourceId,
-        requesterId,
-      },
-      data: {
-        locked: false,
-      },
-    })
+  async unlock(resourceId: number, requesterId: string, startTime?: Date, endTime?: Date) {
+    if (startTime && endTime) {
+      const startDates = Array((endTime.getTime() - startTime.getTime()) / (15 * 60000))
+        .fill(0)
+        .map((_, i) =>
+          dayjs(startTime)
+            .add(15 * i, 'minutes')
+            .toDate(),
+        )
+      const result = await this._prisma.timeSlot.updateMany({
+        where: {
+          resourceId,
+          requesterId,
+          startTime: {
+            in: startDates,
+          },
+        },
+        data: {
+          locked: false,
+        },
+      })
+      return result
+    } else {
+      const result = await this._prisma.timeSlot.updateMany({
+        where: {
+          resourceId,
+          requesterId,
+        },
+        data: {
+          locked: false,
+        },
+      })
+      return result
+    }
   }
 
   async find(resourceId: number): Promise<TimeSlot[]> {

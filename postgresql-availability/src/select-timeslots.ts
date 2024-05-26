@@ -80,16 +80,19 @@ export class TimeSlotRepository {
     )
   }
 
-  async unlock(resourceId: number, requesterId: string) {
-    return await this._prisma.timeSlot2.updateMany({
+  async unlock(resourceId: number, requesterId: string, startTime?: Date, endTime?: Date) {
+    const result = await this._prisma.timeSlot2.updateMany({
       where: {
         requesterId,
         resourceId,
+        ...(startTime && endTime ? { startTime: { gte: startTime }, endTime: { lte: endTime } } : {}),
       },
       data: {
         deleted: true,
       },
     })
+
+    return result
   }
 }
 

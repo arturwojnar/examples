@@ -2,11 +2,11 @@
   "name": "postgresql-availability",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node dist/src/index.js",
     "test": "jest"
   },
   "author": "Artur Wojnar",
@@ -16,6 +16,8 @@
     "@testcontainers/postgresql": "~10.9.0",
     "@types/jest": "~29.5.12",
     "@types/node": "~20.12.12",
+    "@types/pg": "~8.11.6",
+    "@types/pg-copy-streams": "~1.2.5",
     "@typescript-eslint/eslint-plugin": "~6.21.0",
     "eslint": "~8.57.0",
     "eslint-config-prettier": "~9.1.0",
@@ -35,6 +37,8 @@
   "dependencies": {
     "@prisma/client": "~5.14.0",
     "dayjs": "~1.11.10",
+    "pg": "~8.11.5",
+    "pg-copy-streams": "~6.0.6",
     "postgres": "~3.4.4",
     "testcontainers": "~10.9.0"
   }

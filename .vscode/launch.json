@@ -21,7 +21,7 @@
       "skipFiles": [
         "<node_internals>/**"
       ],
-      "program": "postgresql-availability/dist/index.js",
+      "program": "postgresql-availability/dist/src/index.js",
       "runtimeArgs": ["--experimental-modules"]
     },
     {

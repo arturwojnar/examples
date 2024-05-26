@@ -9,32 +9,28 @@ import { avg } from './utils.js'
 const firstDate = new Date('2024-05-01 10:00:00')
 const main = async () => {
   try {
-    console.info(`--------- Test from the beginning of the range ---------`)
-    const [a1, b1] = await testSelectAggregate(firstDate)
-    console.info(`------------------------------------------------------`)
+    // await populateSelectTimeSlots(5432, 'test', 'test')
+    console.info(`Test from the beginning of the range\r\n`)
+    const [a1, b1] = await test15MinTimeslotsAggregate(firstDate)
 
-    console.info(`--------- Test from the beginning of the range ---------`)
-    const [a2, b2] = await testSelectAggregate(
+    console.info(`Test from the middle of the range`)
+    const [a2, b2] = await test15MinTimeslotsAggregate(
       dayjs(firstDate)
         .add(40 * 30, 'days')
         .toDate(),
     )
-    console.info(`------------------------------------------------------`)
-
-    console.info(`--------- Test the end of the range ---------`)
-    const [a3, b3] = await testSelectAggregate(
+    console.info(`\r\n`)
+    console.info(`Test the end of the range`)
+    const [a3, b3] = await test15MinTimeslotsAggregate(
       dayjs(firstDate)
         .add(70 * 30, 'days')
         .toDate(),
     )
-    console.info(`------------------------------------------------------`)
-
-    console.info(`Average for conflicts ${avg([a1, a2, a3])}`)
-    console.info(`Average for inserts ${avg([b1, b2, b3])}`)
-
-    console.info(`------------------------------------------------------`)
-
-    await testSelectUnlocking()
+    console.info(`\r\n`)
+    console.info(`* Average for conflicts ${avg([a1, a2, a3])}`)
+    console.info(`* Average for inserts ${avg([b1, b2, b3])}`)
+    console.info(`\r\n`)
+    await test15MinTimeslotsUnlocking()
   } catch (error) {
     console.error(error)
   }

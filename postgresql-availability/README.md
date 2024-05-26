@@ -54,39 +54,48 @@ CREATE TABLE TimeSlot3(
 120 000 000 rows
 
 Test from the beginning of the range
-* Average for conflicts is 8.911540666719278 ms
-* Average for inserts is 6.369238833338022 ms
 
-Test from the beginning of the range
-* Average for conflicts is 5.866388833367576 ms
-* Average for inserts is 5.912630366751303 ms
+* Average for conflicts is 5.108751233294607 ms
+* Average for inserts is 6.4359818000656865 ms
+
+Test from the middle of the range
+* Average for conflicts is 2.173837499941389 ms
+* Average for inserts is 6.095734866677473 ms
 
 Test the end of the range
-* Average for conflicts is 5.484727799954514 ms
-* Average for inserts is 5.848641833321502 ms
+* Average for conflicts is 2.3753029664978387 ms
+* Average for inserts is 6.594922833393017 ms
 
-End results:
-* Average for conflicts 6.754219100013789
-* Average for inserts 6.043503677803609
+Total:
+* Average for conflicts 3.2192972332446117
+* Average for inserts 6.375546500045393
+
+Unlocking/Reclocking:
+* Average for unlocking is 4.706522999983281 ms
+* Average for relocking is 5.857777599990368 ms
 
 ### "WHERE" Aggregate
 1000000 rows
 
 Test from the beginning of the range
-* Average for conflicts is 6.390330200068032 ms
-* Average for inserts is 3.4294311667016397 ms
+* Average for conflicts is 5.128713533344368 ms
+* Average for inserts is 3.4463379666519662 ms
 
 Test from the beginning of the range
-* Average for conflicts is 3.574126633334284 ms
-* Average for inserts is 3.433963466621935 ms
+* Average for conflicts is 2.2198472000154044 ms
+* Average for inserts is 3.7784811333442727 ms
 
 Test the end of the range
-* Average for conflicts is 3.264059433247894 ms
-* Average for inserts is 3.385712166673814 ms
+* Average for conflicts is 2.3457417333343376 ms
+* Average for inserts is 3.2697424333387364 ms
 
-End results:
-* Average for conflicts 4.4095054222167365
-* Average for inserts 3.4163689333324627
+Total:
+* Average for conflicts 3.231434155564703
+* Average for inserts 3.498187177778325
+
+Unlocking/Reclocking:
+* Average for unlocking is 2.8717502666676107 ms
+* Average for relocking is 3.1760894333400453 ms
 
 ### "GIST" Aggregate
 1000000 rows
