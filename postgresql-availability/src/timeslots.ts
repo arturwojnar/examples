@@ -4,7 +4,7 @@ const prisma = new PrismaClient()
 
 /* ---------- TimeSlot ---------- */
 import dayjs from 'dayjs'
-import { DefaultArgs } from '@prisma/client/runtime/library'
+// import { DefaultArgs } from '@prisma/client/runtime/library'
 
 export class TimeSlot {
   constructor(
@@ -44,7 +44,7 @@ export class TimeSlotRepository {
   async create(
     slot: TimeSlot,
     tx: Omit<
-      PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
+      PrismaClient<Prisma.PrismaClientOptions, never, any>,
       '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
     > = this._prisma,
   ) {
@@ -74,7 +74,7 @@ export class TimeSlotRepository {
   async lock(
     slots: TimeSlot[],
     tx: Omit<
-      PrismaClient<Prisma.PrismaClientOptions, never, DefaultArgs>,
+      PrismaClient<Prisma.PrismaClientOptions, never, any>,
       '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
     > = this._prisma,
   ) {

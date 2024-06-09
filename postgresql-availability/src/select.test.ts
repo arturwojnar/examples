@@ -1,8 +1,9 @@
-import { describe, expect, test } from '@jest/globals'
+import { describe, expect, test, jest } from '@jest/globals'
 import { PrismaClient } from '@prisma/client'
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { exec } from 'child_process'
 import util from 'util'
+import { __dirname } from '../dirnameUtil.mjs'
 import { TimeSlot, TimeSlotRepository } from './select-timeslots'
 
 const execPromise = util.promisify(exec)
@@ -10,7 +11,7 @@ const execPromise = util.promisify(exec)
 async function runMigrations(url: string) {
   try {
     const { stdout, stderr } = await execPromise(
-      `DATABASE_URL="${url}" npx prisma migrate deploy --schema=${__dirname}/../prisma/schema.prisma`,
+      `DATABASE_URL="${url}" npx prisma migrate deploy --schema=${__dirname}/prisma/schema.prisma`,
     )
 
     console.log(`Migration stdout: ${stdout}`)
@@ -29,7 +30,6 @@ describe(`select`, () => {
   const resourceId1 = 1000
   const resourceId2 = 2000
   const requester1 = `artur`
-  const requester2 = `sabina`
   const timeslot = new TimeSlot(
     resourceId1,
     new Date(`2024-05-22 10:00:00`),

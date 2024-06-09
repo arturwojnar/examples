@@ -13,12 +13,12 @@ const requesterId2 = `sabina`
 const repo = new TimeSlotRepository()
 
 export const generateTimeSlots = function* () {
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 1200; i++) {
     const from = dayjs(initialDate)
       .add(i * 30, 'days')
       .toDate()
 
-    for (let resourceId = 0; resourceId < 10000; resourceId++) {
+    for (let resourceId = 0; resourceId < 100000; resourceId++) {
       const slot = {
         resourceId,
         requesterId,

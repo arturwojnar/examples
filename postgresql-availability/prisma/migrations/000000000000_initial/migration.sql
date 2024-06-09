@@ -28,7 +28,7 @@ CREATE TABLE "timeslot3" (
     "id" SERIAL NOT NULL,
     "requesterid" TEXT,
     "resourceid" INTEGER,
-    "date_range" daterange,
+    "date_range" tsrange,
     "deleted" BOOLEAN,
     CONSTRAINT "timeslot3_pkey" PRIMARY KEY ("id")
 );
@@ -38,6 +38,9 @@ ADD CONSTRAINT "timeslot3_excl" EXCLUDE USING GIST
     "resourceid" WITH =, 
     "date_range" WITH && 
 ) WHERE ("deleted" IS FALSE);
+CREATE UNIQUE INDEX "TimeSlot3_resourceId_daterange"
+	ON "timeslot3"("requesterid", "resourceid", "date_range", "deleted");
+
 
 -- CreateTable
 CREATE TABLE "v_count" (

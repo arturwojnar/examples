@@ -17,19 +17,19 @@ const repo = new TimeSlotRepository()
 export const generateTimeSlots = function* () {
   for (let i = 0; i < 100; i++) {
     const from = dayjs(firstDate)
-      .add(i * 10, 'days')
+      .add(i * 30, 'days')
       .toDate()
 
-    for (let resourceId = 1; resourceId < 1000; resourceId++) {
+    for (let resourceId = 0; resourceId < 10000; resourceId++) {
       const slot = {
         resourceId,
         requesterId,
         startTime: from,
-        endTime: dayjs(from).add(7500, 'minutes').toDate(),
+        endTime: dayjs(from).add(30, 'hours').toDate(),
         deleted: false,
       }
 
-      yield `${slot.requesterId},${slot.resourceId},${slot.startTime.toISOString()}-${slot.endTime.toISOString()},False`
+      yield `${slot.requesterId},${slot.resourceId},"[${slot.startTime.toISOString()},${slot.endTime.toISOString()})",False\r\n`
     }
   }
 }
@@ -100,8 +100,10 @@ export const testUnlocking = async (): Promise<[number, number]> => {
 
   for (let i = 0; i < results1.length; i++) {
     const start = performance.now()
+    const from = dayjs(firstDate).add(i * 30, 'days')
+    const to = from.add(30, 'hours')
 
-    await removeAvailability(resourceIds[i], requesterId)
+    await removeAvailability(resourceIds[i], requesterId, from.toDate(), to.toDate())
 
     results1[i] = performance.now() - start
   }
@@ -110,7 +112,7 @@ export const testUnlocking = async (): Promise<[number, number]> => {
 
   for (let i = 0; i < results2.length; i++) {
     const from = dayjs(firstDate).add(i * 30, 'days')
-    const to = from.add(1, 'day')
+    const to = from.add(30, 'hours')
     const start = performance.now()
     await saveAvailability(from.toDate(), to.toDate(), requesterId, resourceIds[i])
     results2[i] = performance.now() - start
@@ -125,6 +127,6 @@ const saveAvailability = async (from: Date, to: Date, requesterId: string, resou
   await repo.create(new TimeSlot([from, to], resourceId, requesterId))
 }
 
-const removeAvailability = async (resourceId: number, requesterId: string) => {
-  await repo.unlock(requesterId, resourceId)
+const removeAvailability = async (resourceId: number, requesterId: string, startTime: Date, endTime: Date) => {
+  await repo.unlock(requesterId, resourceId, startTime, endTime)
 }

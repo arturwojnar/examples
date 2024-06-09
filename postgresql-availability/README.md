@@ -36,7 +36,7 @@ CREATE TABLE TimeSlot3(
 	id SERIAL PRIMARY KEY,
 	requesterId text,
 	resourceId  integer,
-	date_range daterange,
+	date_range tsrange,
 	locked boolean,
 	EXCLUDE USING GIST (resourceId WITH =, date_range WITH &&)
 );
@@ -101,17 +101,21 @@ Unlocking/Reclocking:
 1000000 rows
 
 Test from the beginning of the range
-* Average for conflicts is 4.049273299953589 ms
-* Average for inserts is 2.3283572999450066 ms
+* Average for conflicts is 2.5197022000017264 ms
+* Average for inserts is 2.096867100040739 ms
 
-Test from the beginning of the range
-* Average for conflicts is 2.1195229666928452 ms
-* Average for inserts is 2.5530193999099233 ms
+Test from the middle of the range
+* Average for conflicts is 0.8248383999957393 ms
+* Average for inserts is 2.164987766649574 ms
 
 Test the end of the range
-* Average for conflicts is 2.376330466599514 ms
-* Average for inserts is 2.460807333420962 ms
+* Average for conflicts is 1.0798298999822389 ms
+* Average for inserts is 2.2244044999436787 ms
 
 End results:
-* Average for conflicts 2.8483755777486497
-* Average for inserts 2.4473946777586306
+* Average for conflicts 1.4747901666599015
+* Average for inserts 2.1620864555446637
+
+Unlocking/Reclocking:
+* Average for unlocking is 2.23990056666856 ms
+* Average for relocking is 2.0603567000012846 ms

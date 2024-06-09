@@ -139,7 +139,7 @@ const saveAvailability = async (from: Date, to: Date, requesterId: string, resou
   const repo = new TimeSlotRepository()
   const availability = new TimeAvailability(resourceId)
   const timeslots = await availability.lock(requesterId, from, to)
-  await repo.createMany(timeslots)
+  await repo.lock(timeslots)
 }
 
 const removeAvailability = async (resourceId: number, requesterId: string, startTime: Date, endTime: Date) => {

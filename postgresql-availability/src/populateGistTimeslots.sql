@@ -19,7 +19,7 @@ BEGIN
 
       -- Insert the record into the TimeSlot table
       INSERT INTO "timeslot3" ("requesterid", "resourceid", "date_range")
-      VALUES ('artur', j, daterange(start_time, end_time, '[]'));
+      VALUES ('artur', j, tsrange(start_time, end_time, '[)'));
     END LOOP;
   END LOOP;
 END;

@@ -1,8 +1,9 @@
-import { describe, expect, test } from '@jest/globals'
+import { describe, expect, test, jest } from '@jest/globals'
 import { PrismaClient } from '@prisma/client'
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { exec } from 'child_process'
 import util from 'util'
+import { __dirname } from '../dirnameUtil.mjs'
 import { TimeSlot, TimeSlotRepository } from './timeslots'
 
 const execPromise = util.promisify(exec)
@@ -10,7 +11,7 @@ const execPromise = util.promisify(exec)
 async function runMigrations(url: string) {
   try {
     const { stdout, stderr } = await execPromise(
-      `DATABASE_URL="${url}" npx prisma migrate deploy --schema=${__dirname}/../prisma/schema.prisma`,
+      `DATABASE_URL="${url}" npx prisma migrate deploy --schema=${__dirname}/prisma/schema.prisma`,
     )
 
     console.log(`Migration stdout: ${stdout}`)
@@ -29,7 +30,6 @@ describe(`time slots`, () => {
   const resourceId1 = 1000
   const resourceId2 = 2000
   const requester1 = `artur`
-  const requester2 = `sabina`
   const timeslots = [
     new TimeSlot(new Date(`2024-05-22 10:00:00`), new Date(`2024-05-22 10:15:00`), resourceId1, requester1),
     new TimeSlot(new Date(`2024-05-22 10:15:00`), new Date(`2024-05-22 10:30:00`), resourceId1, requester1),
@@ -57,7 +57,7 @@ describe(`time slots`, () => {
   test(`time slots can be added`, async () => {
     const repo = new TimeSlotRepository(prisma)
 
-    await repo.createMany(timeslots)
+    await repo.lock(timeslots)
     const result = await repo.find(resourceId1)
 
     expect(result.length).toBe(4)
@@ -80,7 +80,7 @@ describe(`time slots`, () => {
   test(`the same time slots can be added but for different resource`, async () => {
     const repo = new TimeSlotRepository(prisma)
 
-    await repo.createMany([
+    await repo.lock([
       new TimeSlot(new Date(`2024-05-22 10:00:00`), new Date(`2024-05-22 10:15:00`), resourceId2, requester1),
       new TimeSlot(new Date(`2024-05-22 10:15:00`), new Date(`2024-05-22 10:30:00`), resourceId2, requester1),
       new TimeSlot(new Date(`2024-05-22 10:30:00`), new Date(`2024-05-22 10:35:00`), resourceId2, requester1),
@@ -116,7 +116,7 @@ describe(`time slots`, () => {
   test(`slots can be locked again`, async () => {
     const repo = new TimeSlotRepository(prisma)
 
-    await repo.createMany(timeslots)
+    await repo.lock(timeslots)
     const result = await repo.find(resourceId1)
 
     expect(result).toEqual(

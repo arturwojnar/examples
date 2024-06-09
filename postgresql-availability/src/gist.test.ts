@@ -1,8 +1,9 @@
-import { describe, expect, test } from '@jest/globals'
+import { describe, expect, jest, test } from '@jest/globals'
 import { PrismaClient } from '@prisma/client'
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { exec } from 'child_process'
 import util from 'util'
+import { __dirname } from '../dirnameUtil.mjs'
 import { TimeSlot, TimeSlotRepository } from './gist-timeslots'
 
 const execPromise = util.promisify(exec)
@@ -10,7 +11,7 @@ const execPromise = util.promisify(exec)
 async function runMigrations(url: string) {
   try {
     const { stdout, stderr } = await execPromise(
-      `DATABASE_URL="${url}" npx prisma migrate deploy --schema=${__dirname}/../prisma/schema.prisma`,
+      `DATABASE_URL="${url}" npx prisma migrate deploy --schema=${__dirname}/prisma/schema.prisma`,
     )
 
     console.log(`Migration stdout: ${stdout}`)

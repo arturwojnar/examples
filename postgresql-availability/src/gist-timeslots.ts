@@ -48,7 +48,7 @@ export class TimeSlotRepository {
 
   async create({ requesterId, resourceId, date_range }: TimeSlot) {
     await this._prisma.$executeRawUnsafe(`
-      INSERT INTO "timeslot3" (requesterId, resourceId, date_range, deleted) VALUES ('${requesterId}', ${resourceId}, daterange('${date_range[0].toISOString()}', '${date_range[1].toISOString()}', '[]'), False)
+      INSERT INTO "timeslot3" (requesterId, resourceId, date_range, deleted) VALUES ('${requesterId}', ${resourceId}, tsrange('${date_range[0].toISOString()}', '${date_range[1].toISOString()}', '[)'), False)
     `)
   }
 
@@ -67,15 +67,15 @@ export class TimeSlotRepository {
     )
   }
 
-  async unlock(requesterid: string, resourceid: number) {
-    return await this._prisma.timeslot3.updateMany({
-      where: {
-        requesterid,
-        resourceid,
-      },
-      data: {
-        deleted: true,
-      },
-    })
+  async unlock(requesterid: string, resourceid: number, startTime?: Date, endTime?: Date) {
+    if (startTime && endTime) {
+      return await this._prisma.$executeRawUnsafe(`
+      UPDATE "timeslot3" SET "deleted"=True WHERE "requesterid"='${requesterid}' AND "resourceid"=${resourceid} AND "deleted"=False AND "date_range"=tsrange('${startTime.toISOString()}', '${endTime.toISOString()}', '[)')
+    `)
+    } else {
+      return await this._prisma.$executeRawUnsafe(`
+      UPDATE "timeslot3" SET "deleted"=True WHERE "requesterid"='${requesterid}' AND "resourceid"=${resourceid} AND "deleted"=False
+    `)
+    }
   }
 }

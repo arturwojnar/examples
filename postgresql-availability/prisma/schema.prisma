@@ -38,7 +38,7 @@ model timeslot3 {
   id          Int                       @id @default(autoincrement())
   requesterid String?
   resourceid  Int?
-  date_range  Unsupported("daterange")?
+  date_range  Unsupported("tsrange")?
   deleted      Boolean? @default(false)
 }
 
