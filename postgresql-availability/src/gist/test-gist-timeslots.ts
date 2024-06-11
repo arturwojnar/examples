@@ -1,45 +1,35 @@
+import { PrismaClient } from '@prisma/client'
 import dayjs from 'dayjs'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import pg from 'pg'
 import { from as copyFrom } from 'pg-copy-streams'
-import { TimeAvailability, TimeSlotRepository } from './timeslots.js'
-import { avg } from './utils.js'
+import { TimeSlot, TimeSlotRepository } from './gist-timeslots.js'
+import { avg } from '../utils.js'
 
 const { Client } = pg
-const initialDate = new Date('2024-05-01 10:00:00')
+const firstDate = new Date('2024-05-01 10:00:00')
 const requesterId = `artur`
 const requesterId2 = `sabina`
+const prisma = new PrismaClient()
+const repo = new TimeSlotRepository()
 
 export const generateTimeSlots = function* () {
-  const TO_MINUTES = 60000
-
   for (let i = 0; i < 100; i++) {
-    const from = dayjs(initialDate)
+    const from = dayjs(firstDate)
       .add(i * 30, 'days')
       .toDate()
-    const timeSlotSize = 15
 
     for (let resourceId = 0; resourceId < 10000; resourceId++) {
-      const result = Array(120)
-        .fill(0)
-        .map((_, i) => {
-          const startTime = new Date(from.getTime() + i * timeSlotSize * TO_MINUTES)
-          return {
-            resourceId,
-            requesterId,
-            startTime,
-            endTime: new Date(startTime.getTime() + timeSlotSize * TO_MINUTES),
-            locked: true,
-          }
-        })
-        .map(
-          (slot) =>
-            `${slot.requesterId},${slot.resourceId},${slot.startTime.toISOString()},${slot.endTime.toISOString()},True`,
-        )
-        .join(`\r\n`)
+      const slot = {
+        resourceId,
+        requesterId,
+        startTime: from,
+        endTime: dayjs(from).add(30, 'hours').toDate(),
+        deleted: false,
+      }
 
-      yield `${result}\r\n`
+      yield `${slot.requesterId},${slot.resourceId},"[${slot.startTime.toISOString()},${slot.endTime.toISOString()})",False\r\n`
     }
   }
 }
@@ -57,9 +47,7 @@ export const populateTimeSlots = async (port: number, user: string, password: st
     await client.connect()
     const source = Readable.from(generateTimeSlots())
     const copyPsqlStream = client.query(
-      copyFrom(
-        'COPY "TimeSlot" ("requesterId", "resourceId", "startTime", "endTime", "locked") FROM STDIN WITH (FORMAT csv)',
-      ),
+      copyFrom('COPY "timeslot3" ("requesterid", "resourceid", "date_range", "deleted") FROM STDIN WITH (FORMAT csv)'),
     )
     const s1 = new Date().getTime()
     await pipeline(source, copyPsqlStream)
@@ -71,7 +59,8 @@ export const populateTimeSlots = async (port: number, user: string, password: st
   }
 }
 
-export const test = async (startDate: Date): Promise<[number, number]> => {
+export const test = async (startDate: Date) => {
+  // await populateTimeSlots()
   const results1 = new Array<number>(30)
   const results2 = new Array<number>(30)
 
@@ -81,7 +70,6 @@ export const test = async (startDate: Date): Promise<[number, number]> => {
     const start = performance.now()
     try {
       await saveAvailability(from.toDate(), to.toDate(), requesterId2)
-      throw new Error(`Conflict. It should've not happened`)
     } catch {
       //
     }
@@ -112,7 +100,7 @@ export const testUnlocking = async (): Promise<[number, number]> => {
 
   for (let i = 0; i < results1.length; i++) {
     const start = performance.now()
-    const from = dayjs(initialDate).add(i * 30, 'days')
+    const from = dayjs(firstDate).add(i * 30, 'days')
     const to = from.add(30, 'hours')
 
     await removeAvailability(resourceIds[i], requesterId, from.toDate(), to.toDate())
@@ -123,7 +111,7 @@ export const testUnlocking = async (): Promise<[number, number]> => {
   console.info(`* Average for unlocking is ${avg(results1)} ms`)
 
   for (let i = 0; i < results2.length; i++) {
-    const from = dayjs(initialDate).add(i * 30, 'days')
+    const from = dayjs(firstDate).add(i * 30, 'days')
     const to = from.add(30, 'hours')
     const start = performance.now()
     await saveAvailability(from.toDate(), to.toDate(), requesterId, resourceIds[i])
@@ -136,13 +124,9 @@ export const testUnlocking = async (): Promise<[number, number]> => {
 }
 
 const saveAvailability = async (from: Date, to: Date, requesterId: string, resourceId = 100) => {
-  const repo = new TimeSlotRepository()
-  const availability = new TimeAvailability(resourceId)
-  const timeslots = await availability.lock(requesterId, from, to)
-  await repo.lock(timeslots)
+  await repo.create(new TimeSlot([from, to], resourceId, requesterId))
 }
 
 const removeAvailability = async (resourceId: number, requesterId: string, startTime: Date, endTime: Date) => {
-  const repo = new TimeSlotRepository()
-  await repo.unlock(resourceId, requesterId, startTime, endTime)
+  await repo.unlock(requesterId, resourceId, startTime, endTime)
 }

@@ -20,4 +20,5 @@ export default {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   extensionsToTreatAsEsm: ['.ts'],
   rootDir: __dirname,
+  testMatch: ['**/?(*.)+(spec|test).ts'],
 }

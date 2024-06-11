@@ -1,26 +1,26 @@
-import { PrismaClient } from '@prisma/client'
 import dayjs from 'dayjs'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import pg from 'pg'
 import { from as copyFrom } from 'pg-copy-streams'
-import { TimeSlot, TimeSlotRepository } from './gist-timeslots.js'
-import { avg } from './utils.js'
+import { TimeAvailability, TimeSlotRepository } from './select-timeslots.js'
+import { avg } from '../utils.js'
+import { PrismaClient } from '@prisma/client'
 
 const { Client } = pg
-const firstDate = new Date('2024-05-01 10:00:00')
+const initialDate = new Date('2024-05-01 10:00:00')
 const requesterId = `artur`
 const requesterId2 = `sabina`
 const prisma = new PrismaClient()
-const repo = new TimeSlotRepository()
+const repo = new TimeSlotRepository(prisma, 5432)
 
 export const generateTimeSlots = function* () {
-  for (let i = 0; i < 100; i++) {
-    const from = dayjs(firstDate)
+  for (let i = 0; i < 1200; i++) {
+    const from = dayjs(initialDate)
       .add(i * 30, 'days')
       .toDate()
 
-    for (let resourceId = 0; resourceId < 10000; resourceId++) {
+    for (let resourceId = 0; resourceId < 100000; resourceId++) {
       const slot = {
         resourceId,
         requesterId,
@@ -29,7 +29,7 @@ export const generateTimeSlots = function* () {
         deleted: false,
       }
 
-      yield `${slot.requesterId},${slot.resourceId},"[${slot.startTime.toISOString()},${slot.endTime.toISOString()})",False\r\n`
+      yield `${slot.requesterId},${slot.resourceId},${slot.startTime.toISOString()},${slot.endTime.toISOString()},False\r\n`
     }
   }
 }
@@ -47,7 +47,9 @@ export const populateTimeSlots = async (port: number, user: string, password: st
     await client.connect()
     const source = Readable.from(generateTimeSlots())
     const copyPsqlStream = client.query(
-      copyFrom('COPY "timeslot3" ("requesterid", "resourceid", "date_range", "deleted") FROM STDIN WITH (FORMAT csv)'),
+      copyFrom(
+        'COPY "TimeSlot2" ("requesterId", "resourceId", "startTime", "endTime", "deleted") FROM STDIN WITH (FORMAT csv)',
+      ),
     )
     const s1 = new Date().getTime()
     await pipeline(source, copyPsqlStream)
@@ -59,8 +61,7 @@ export const populateTimeSlots = async (port: number, user: string, password: st
   }
 }
 
-export const test = async (startDate: Date) => {
-  // await populateTimeSlots()
+export const test = async (startDate: Date): Promise<[number, number]> => {
   const results1 = new Array<number>(30)
   const results2 = new Array<number>(30)
 
@@ -70,6 +71,7 @@ export const test = async (startDate: Date) => {
     const start = performance.now()
     try {
       await saveAvailability(from.toDate(), to.toDate(), requesterId2)
+      throw new Error('Not expected')
     } catch {
       //
     }
@@ -100,7 +102,7 @@ export const testUnlocking = async (): Promise<[number, number]> => {
 
   for (let i = 0; i < results1.length; i++) {
     const start = performance.now()
-    const from = dayjs(firstDate).add(i * 30, 'days')
+    const from = dayjs(initialDate).add(i * 30, 'days')
     const to = from.add(30, 'hours')
 
     await removeAvailability(resourceIds[i], requesterId, from.toDate(), to.toDate())
@@ -111,7 +113,7 @@ export const testUnlocking = async (): Promise<[number, number]> => {
   console.info(`* Average for unlocking is ${avg(results1)} ms`)
 
   for (let i = 0; i < results2.length; i++) {
-    const from = dayjs(firstDate).add(i * 30, 'days')
+    const from = dayjs(initialDate).add(i * 30, 'days')
     const to = from.add(30, 'hours')
     const start = performance.now()
     await saveAvailability(from.toDate(), to.toDate(), requesterId, resourceIds[i])
@@ -124,9 +126,14 @@ export const testUnlocking = async (): Promise<[number, number]> => {
 }
 
 const saveAvailability = async (from: Date, to: Date, requesterId: string, resourceId = 100) => {
-  await repo.create(new TimeSlot([from, to], resourceId, requesterId))
+  const availability = new TimeAvailability(resourceId)
+
+  const aggregate = await availability.lock(requesterId, from, to)
+
+  await repo.create(aggregate)
 }
 
 const removeAvailability = async (resourceId: number, requesterId: string, startTime: Date, endTime: Date) => {
-  await repo.unlock(requesterId, resourceId, startTime, endTime)
+  const repo = new TimeSlotRepository(prisma, 5432)
+  await repo.unlock(resourceId, requesterId, startTime, endTime)
 }

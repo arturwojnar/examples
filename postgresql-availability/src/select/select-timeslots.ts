@@ -1,6 +1,15 @@
 import { PrismaClient } from '@prisma/client'
+import postgres from 'postgres'
 
 const prisma = new PrismaClient()
+
+export interface TimeSlot {
+  requesterId: string
+  resourceId: number
+  startTime: Date
+  endTime: Date
+  deleted: boolean
+}
 
 /* ---------- TimeSlot ---------- */
 import dayjs from 'dayjs'
@@ -38,12 +47,24 @@ export class TimeSlot {
 
 /* ---------- TimeSlotRepository ---------- */
 export class TimeSlotRepository {
-  constructor(private _prisma = prisma) {}
+  private _sql: postgres.Sql<Record<string, postgres.PostgresType>>
+
+  constructor(
+    private _prisma = prisma,
+    private _port: number,
+  ) {
+    this._sql = postgres({
+      host: 'localhost',
+      port: this._port,
+      database: 'test',
+      username: 'test',
+      password: 'test',
+    })
+  }
 
   async create({ requesterId, resourceId, startTime: from, endTime: to }: TimeSlot) {
-    await this._prisma.$transaction(async (prisma) => {
-      return await prisma.$executeRawUnsafe(
-        `
+    await this._sql.begin(async (sql) => {
+      await sql.unsafe(`
         DO $$
         DECLARE
           v_count INTEGER;
@@ -59,15 +80,14 @@ export class TimeSlotRepository {
           FOR UPDATE;
         
           IF FOUND THEN
-            RAISE EXCEPTION 'CONFLICT';
+            RAISE EXCEPTION 'CONFLICT on ${from.toISOString()}-${to.toISOString()} (${resourceId})';
           END IF;
         
           INSERT INTO "TimeSlot2" ("requesterId", "resourceId", "startTime", "endTime", "deleted")
           VALUES ('${requesterId}', ${resourceId}, '${from.toISOString()}', '${to.toISOString()}', False);
-        
+
         END $$;
-        `,
-      )
+      `)
     })
   }
 
