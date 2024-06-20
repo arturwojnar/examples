@@ -5,11 +5,14 @@ import pg from 'pg'
 import { from as copyFrom } from 'pg-copy-streams'
 import { TimeAvailability, TimeSlotRepository } from './timeslots.js'
 import { avg } from '../utils.js'
+import { PrismaClient } from '@prisma/client'
 
+const prisma = new PrismaClient()
 const { Client } = pg
 const initialDate = new Date('2024-05-01 10:00:00')
 const requesterId = `artur`
 const requesterId2 = `sabina`
+const repo = new TimeSlotRepository(prisma, 5432)
 
 export const generateTimeSlots = function* () {
   const TO_MINUTES = 60000
@@ -136,13 +139,11 @@ export const testUnlocking = async (): Promise<[number, number]> => {
 }
 
 const saveAvailability = async (from: Date, to: Date, requesterId: string, resourceId = 100) => {
-  const repo = new TimeSlotRepository()
   const availability = new TimeAvailability(resourceId)
-  const timeslots = await availability.lock(requesterId, from, to)
+  const timeslots = await availability.getSlotsForDateRange(requesterId, from, to)
   await repo.lock(timeslots)
 }
 
 const removeAvailability = async (resourceId: number, requesterId: string, startTime: Date, endTime: Date) => {
-  const repo = new TimeSlotRepository()
   await repo.unlock(resourceId, requesterId, startTime, endTime)
 }

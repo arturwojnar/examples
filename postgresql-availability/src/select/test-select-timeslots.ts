@@ -12,7 +12,7 @@ const initialDate = new Date('2024-05-01 10:00:00')
 const requesterId = `artur`
 const requesterId2 = `sabina`
 const prisma = new PrismaClient()
-const repo = new TimeSlotRepository(prisma, 5432)
+const repo = new TimeSlotRepository(5432)
 
 export const generateTimeSlots = function* () {
   for (let i = 0; i < 1200; i++) {
@@ -130,10 +130,10 @@ const saveAvailability = async (from: Date, to: Date, requesterId: string, resou
 
   const aggregate = await availability.lock(requesterId, from, to)
 
-  await repo.create(aggregate)
+  await repo.lock(aggregate)
 }
 
 const removeAvailability = async (resourceId: number, requesterId: string, startTime: Date, endTime: Date) => {
-  const repo = new TimeSlotRepository(prisma, 5432)
+  const repo = new TimeSlotRepository(5432)
   await repo.unlock(resourceId, requesterId, startTime, endTime)
 }

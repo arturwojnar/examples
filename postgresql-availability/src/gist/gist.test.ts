@@ -38,10 +38,12 @@ describe(`gist`, () => {
   )
 
   let prisma: PrismaClient
+  let port: number
   let container: StartedPostgreSqlContainer
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer().start()
+    port = container.getPort()
     const datasourceUrl = `postgresql://${container.getUsername()}:${container.getPassword()}@${container.getHost()}:${container.getPort()}/${container.getDatabase()}?schema=public`
     prisma = new PrismaClient({ datasourceUrl })
     await prisma.$connect()
@@ -55,7 +57,7 @@ describe(`gist`, () => {
   })
 
   test(`time slots can be added`, async () => {
-    const repo = new TimeSlotRepository(prisma)
+    const repo = new TimeSlotRepository(prisma, port)
 
     await repo.create(timeslot)
     const result = await repo.find(resourceId1)
@@ -71,7 +73,7 @@ describe(`gist`, () => {
   })
 
   test(`can't add an overlapping timeslot`, async () => {
-    const repo = new TimeSlotRepository(prisma)
+    const repo = new TimeSlotRepository(prisma, port)
 
     await expect(() =>
       repo.create(
@@ -81,7 +83,7 @@ describe(`gist`, () => {
   })
 
   test(`the same time slots can be added but for different resource`, async () => {
-    const repo = new TimeSlotRepository(prisma)
+    const repo = new TimeSlotRepository(prisma, port)
 
     await repo.create(
       new TimeSlot([new Date(`2024-05-22 10:00:00`), new Date(`2024-05-22 11:00:00`)], resourceId2, requester1),
@@ -99,7 +101,7 @@ describe(`gist`, () => {
   })
 
   test(`slots can be deleted`, async () => {
-    const repo = new TimeSlotRepository(prisma)
+    const repo = new TimeSlotRepository(prisma, port)
 
     await repo.unlock(requester1, resourceId1)
 
@@ -115,7 +117,7 @@ describe(`gist`, () => {
   })
 
   test(`slots can be created again if deleted previously`, async () => {
-    const repo = new TimeSlotRepository(prisma)
+    const repo = new TimeSlotRepository(prisma, port)
 
     await repo.create(timeslot)
     const result = await repo.find(resourceId1)

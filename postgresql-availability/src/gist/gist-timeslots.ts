@@ -1,6 +1,7 @@
 /* ---------- TimeSlot ---------- */
 import { PrismaClient } from '@prisma/client'
 import dayjs from 'dayjs'
+import postgres from 'postgres'
 
 const prisma = new PrismaClient()
 
@@ -44,12 +45,31 @@ export class TimeAvailability {
 
 /* ---------- TimeSlotRepository ---------- */
 export class TimeSlotRepository {
-  constructor(private _prisma = prisma) {}
+  private _sql: postgres.Sql<Record<string, postgres.PostgresType>>
+
+  constructor(
+    private _prisma = prisma,
+    private _port: number,
+  ) {
+    this._sql = postgres({
+      host: 'localhost',
+      port: this._port,
+      database: 'test',
+      username: 'test',
+      password: 'test',
+    })
+  }
 
   async create({ requesterId, resourceId, date_range }: TimeSlot) {
-    await this._prisma.$executeRawUnsafe(`
-      INSERT INTO "timeslot3" (requesterId, resourceId, date_range, deleted) VALUES ('${requesterId}', ${resourceId}, tsrange('${date_range[0].toISOString()}', '${date_range[1].toISOString()}', '[)'), False)
-    `)
+    await this._sql`
+      INSERT INTO "timeslot3" ("requesterid", "resourceid", "date_range", "deleted")
+      VALUES (
+        ${requesterId}::text,
+        ${resourceId}::int,
+        tsrange(${date_range[0].toISOString()}, ${date_range[1].toISOString()}, '[)'),
+        False
+      )
+    `
   }
 
   async find(resourceid: number): Promise<TimeSlot[]> {
@@ -69,13 +89,23 @@ export class TimeSlotRepository {
 
   async unlock(requesterid: string, resourceid: number, startTime?: Date, endTime?: Date) {
     if (startTime && endTime) {
-      return await this._prisma.$executeRawUnsafe(`
-      UPDATE "timeslot3" SET "deleted"=True WHERE "requesterid"='${requesterid}' AND "resourceid"=${resourceid} AND "deleted"=False AND "date_range"=tsrange('${startTime.toISOString()}', '${endTime.toISOString()}', '[)')
-    `)
+      await this._sql`
+        UPDATE "timeslot3"
+        SET "deleted"=True
+        WHERE 
+          "requesterid"=${requesterid}::text AND
+          "resourceid"=${resourceid}::int AND
+          "date_range"=tsrange(${startTime.toISOString()}::timestamp, ${endTime.toISOString()}::timestamp, '[)') AND
+          "deleted"=False
+      `
     } else {
-      return await this._prisma.$executeRawUnsafe(`
-      UPDATE "timeslot3" SET "deleted"=True WHERE "requesterid"='${requesterid}' AND "resourceid"=${resourceid} AND "deleted"=False
-    `)
+      await this._sql`
+        UPDATE "timeslot3"
+        SET "deleted"=True
+        WHERE "requesterid"=${requesterid}::text AND
+        "resourceid"=${resourceid}::int AND
+        "deleted"=False
+      `
     }
   }
 }

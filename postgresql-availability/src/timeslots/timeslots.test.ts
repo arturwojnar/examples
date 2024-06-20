@@ -31,19 +31,21 @@ describe(`time slots`, () => {
   const resourceId2 = 2000
   const requester1 = `artur`
   const timeslots = [
-    new TimeSlot(new Date(`2024-05-22 10:00:00`), new Date(`2024-05-22 10:15:00`), resourceId1, requester1),
+    new TimeSlot(new Date(`2024-05-22T08:00:00.000Z`), new Date(`2024-05-22 10:15:00`), resourceId1, requester1),
     new TimeSlot(new Date(`2024-05-22 10:15:00`), new Date(`2024-05-22 10:30:00`), resourceId1, requester1),
-    new TimeSlot(new Date(`2024-05-22 10:30:00`), new Date(`2024-05-22 10:35:00`), resourceId1, requester1),
-    new TimeSlot(new Date(`2024-05-22 10:45:00`), new Date(`2024-05-22 11:00:00`), resourceId1, requester1),
+    new TimeSlot(new Date(`2024-05-22 10:30:00`), new Date(`2024-05-22T08:45:00.000Z`), resourceId1, requester1),
+    new TimeSlot(new Date(`2024-05-22T08:45:00.000Z`), new Date(`2024-05-22T09:00:00.000Z`), resourceId1, requester1),
   ]
 
   let prisma: PrismaClient
+  let port: number
   let container: StartedPostgreSqlContainer
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer().start()
     const datasourceUrl = `postgresql://${container.getUsername()}:${container.getPassword()}@${container.getHost()}:${container.getPort()}/${container.getDatabase()}?schema=public`
     prisma = new PrismaClient({ datasourceUrl })
+    port = container.getPort()
     await prisma.$connect()
     await runMigrations(datasourceUrl)
     console.log(1)
@@ -55,7 +57,7 @@ describe(`time slots`, () => {
   })
 
   test(`time slots can be added`, async () => {
-    const repo = new TimeSlotRepository(prisma)
+    const repo = new TimeSlotRepository(prisma, port)
 
     await repo.lock(timeslots)
     const result = await repo.find(resourceId1)
@@ -70,20 +72,18 @@ describe(`time slots`, () => {
   })
 
   test(`can't add an overlapping timeslot`, async () => {
-    const repo = new TimeSlotRepository(prisma)
+    const repo = new TimeSlotRepository(prisma, port)
 
-    for (let i = 0; i < timeslots.length; i++) {
-      await expect(() => repo.create(timeslots[i])).rejects.toThrowError()
-    }
+    await expect(() => repo.lock(timeslots)).rejects.toThrowError()
   })
 
   test(`the same time slots can be added but for different resource`, async () => {
-    const repo = new TimeSlotRepository(prisma)
+    const repo = new TimeSlotRepository(prisma, port)
 
     await repo.lock([
-      new TimeSlot(new Date(`2024-05-22 10:00:00`), new Date(`2024-05-22 10:15:00`), resourceId2, requester1),
-      new TimeSlot(new Date(`2024-05-22 10:15:00`), new Date(`2024-05-22 10:30:00`), resourceId2, requester1),
-      new TimeSlot(new Date(`2024-05-22 10:30:00`), new Date(`2024-05-22 10:35:00`), resourceId2, requester1),
+      new TimeSlot(new Date(`2024-05-22T08:00:00.000Z`), new Date(`2024-05-22T08:15:00.000Z`), resourceId2, requester1),
+      new TimeSlot(new Date(`2024-05-22T08:15:00.000Z`), new Date(`2024-05-22T08:30:00.000Z`), resourceId2, requester1),
+      new TimeSlot(new Date(`2024-05-22T08:30:00.000Z`), new Date(`2024-05-22T08:45:00.000Z`), resourceId2, requester1),
       new TimeSlot(new Date(`2024-05-22 10:45:00`), new Date(`2024-05-22 11:00:00`), resourceId2, requester1),
     ])
     const result = await repo.find(resourceId2)
@@ -99,9 +99,14 @@ describe(`time slots`, () => {
   })
 
   test(`slots can be unlocked`, async () => {
-    const repo = new TimeSlotRepository(prisma)
+    const repo = new TimeSlotRepository(prisma, port)
 
-    await repo.unlock(resourceId1, requester1)
+    await repo.unlock(
+      resourceId1,
+      requester1,
+      new Date(`2024-05-22T08:00:00.000Z`),
+      new Date(`2024-05-22T09:00:00.000Z`),
+    )
 
     const result = await repo.find(resourceId1)
     expect(result).toEqual(
@@ -114,7 +119,7 @@ describe(`time slots`, () => {
   })
 
   test(`slots can be locked again`, async () => {
-    const repo = new TimeSlotRepository(prisma)
+    const repo = new TimeSlotRepository(prisma, port)
 
     await repo.lock(timeslots)
     const result = await repo.find(resourceId1)

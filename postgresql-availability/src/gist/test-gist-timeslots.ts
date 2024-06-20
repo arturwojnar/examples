@@ -12,15 +12,15 @@ const firstDate = new Date('2024-05-01 10:00:00')
 const requesterId = `artur`
 const requesterId2 = `sabina`
 const prisma = new PrismaClient()
-const repo = new TimeSlotRepository()
+const repo = new TimeSlotRepository(prisma, 5432)
 
 export const generateTimeSlots = function* () {
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 1200; i++) {
     const from = dayjs(firstDate)
       .add(i * 30, 'days')
       .toDate()
 
-    for (let resourceId = 0; resourceId < 10000; resourceId++) {
+    for (let resourceId = 0; resourceId < 100000; resourceId++) {
       const slot = {
         resourceId,
         requesterId,

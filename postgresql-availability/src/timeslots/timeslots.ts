@@ -4,6 +4,7 @@ const prisma = new PrismaClient()
 
 /* ---------- TimeSlot ---------- */
 import dayjs from 'dayjs'
+import postgres from 'postgres'
 // import { DefaultArgs } from '@prisma/client/runtime/library'
 
 export class TimeSlot {
@@ -39,76 +40,32 @@ export class TimeSlot {
 
 /* ---------- TimeSlotRepository ---------- */
 export class TimeSlotRepository {
-  constructor(private _prisma = prisma) {}
+  private _sql: postgres.Sql<Record<string, postgres.PostgresType>>
 
-  async create(
-    slot: TimeSlot,
-    tx: Omit<
-      PrismaClient<Prisma.PrismaClientOptions, never, any>,
-      '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
-    > = this._prisma,
+  constructor(
+    private _prisma = prisma,
+    private _port: number,
   ) {
-    return await tx.$queryRawUnsafe(`
-      DO $$
-      DECLARE
-          v_locked BOOLEAN;
-      BEGIN
-          INSERT INTO "TimeSlot" ("requesterId", "resourceId", "startTime", "endTime", "locked")
-          VALUES ('${slot.requesterId}', ${slot.resourceId}, '${slot.startTime.toISOString()}', '${slot.endTime.toISOString()}', True)
-          ON CONFLICT ("resourceId", "startTime")
-          DO UPDATE SET "startTime" = EXCLUDED."startTime",
-              "endTime" = EXCLUDED."endTime",
-              "requesterId" = EXCLUDED."requesterId",
-              "locked"=True
-          WHERE "TimeSlot"."locked"=False
-          RETURNING "TimeSlot"."locked" INTO v_locked;
-      
-          IF NOT FOUND THEN
-              RAISE EXCEPTION 'CONFLICT';
-          END IF;
-      
-      END $$;
-    `)
+    this._sql = postgres({
+      host: 'localhost',
+      port: this._port,
+      database: 'test',
+      username: 'test',
+      password: 'test',
+    })
   }
 
-  async lock(
-    slots: TimeSlot[],
-    tx: Omit<
-      PrismaClient<Prisma.PrismaClientOptions, never, any>,
-      '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
-    > = this._prisma,
-  ) {
+  async lock(slots: TimeSlot[]) {
     const values: Array<[string, number, Date, Date]> = slots.map((slot) => [
       slot.requesterId,
       slot.resourceId,
       slot.startTime,
       slot.endTime,
     ])
-
-    return await tx.$queryRawUnsafe(`
-      DO $$
-      DECLARE
-          slot JSONB;
-          v_locked BOOLEAN;
-      BEGIN
-          FOR slot IN SELECT * FROM jsonb_array_elements('${JSON.stringify(values)}'::jsonb)
-          LOOP
-              INSERT INTO "TimeSlot" ("requesterId", "resourceId", "startTime", "endTime", "locked")
-              VALUES (slot->>0, (slot->>1)::INTEGER, (slot->>2)::TIMESTAMPTZ, (slot->>3)::TIMESTAMPTZ, True)
-              ON CONFLICT ("resourceId", "startTime")
-              DO UPDATE SET "startTime" = EXCLUDED."startTime",
-                  "endTime" = EXCLUDED."endTime",
-                  "requesterId" = EXCLUDED."requesterId",
-                  "locked"=True
-              WHERE "TimeSlot"."locked"=False
-              RETURNING "TimeSlot"."locked" INTO v_locked;
-      
-              IF NOT FOUND THEN
-                  RAISE EXCEPTION 'CONFLICT';
-              END IF;
-          END LOOP;
-      END $$;
-    `)
+    const jsonString = JSON.stringify(
+      values.map((slot) => [slot[0], slot[1], slot[2].toISOString(), slot[3].toISOString()]),
+    )
+    await this._sql.unsafe(`SELECT upsert_timeslots('${jsonString}'::jsonb)`)
   }
 
   async unlock(resourceId: number, requesterId: string, startTime?: Date, endTime?: Date) {
@@ -118,36 +75,33 @@ export class TimeSlotRepository {
         .map((_, i) =>
           dayjs(startTime)
             .add(15 * i, 'minutes')
-            .toDate(),
+            .toISOString(),
         )
-      const result = await this._prisma.timeSlot.updateMany({
-        where: {
-          resourceId,
-          requesterId,
-          startTime: {
-            in: startDates,
-          },
-        },
-        data: {
-          locked: false,
-        },
-      })
-      return result
+      const result = await this._sql.unsafe(`
+          UPDATE "TimeSlot"
+          SET "locked" = false
+          WHERE "resourceId" = ${resourceId}
+          AND "requesterId" = '${requesterId}'
+          AND "startTime" IN (${startDates.map((date) => `'${date}'`).join(',')})
+      `)
+      return result.count
     } else {
-      const result = await this._prisma.timeSlot.updateMany({
-        where: {
-          resourceId,
-          requesterId,
-        },
-        data: {
-          locked: false,
-        },
-      })
-      return result
+      const result = await this._sql`
+        UPDATE "TimeSlot"
+        SET "locked" = false
+        WHERE "resourceId" = ${resourceId}
+        AND "requesterId" = ${requesterId}::text
+      `
+      return result.count
     }
   }
 
   async find(resourceId: number): Promise<TimeSlot[]> {
+    //   const result = await this._sql<TimeSlot[]>`
+    //   SELECT *
+    //   FROM "TimeSlot"
+    //   WHERE "resourceId" = ${resourceId}
+    // `
     const prismaTimeSlots = await this._prisma.timeSlot.findMany({
       where: { resourceId },
     })
@@ -163,7 +117,7 @@ const TO_MINUTES = 60000
 export class TimeAvailability {
   constructor(private resourceId: number) {}
 
-  async lock(requesterId: string, from: Date, to: Date, timeSlotSize = 15) {
+  async getSlotsForDateRange(requesterId: string, from: Date, to: Date, timeSlotSize = 15) {
     // Calculate slots required
     if ((from.getTime() / TO_MINUTES) % 15 !== 0) {
       throw new Error(`The date has to be a multiple of 15 minutes`)
@@ -175,7 +129,7 @@ export class TimeAvailability {
     const durationMinutes = (to.getTime() - from.getTime()) / TO_MINUTES
     const slotsRequired = Math.ceil(durationMinutes / timeSlotSize)
 
-    // Generate and save new slots
+    // Generate slots
     return Array(slotsRequired)
       .fill(0)
       .map((_, i) => {

@@ -4,6 +4,9 @@ import { __dirname, __filename } from './dirnameUtil.mjs'
 export default {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
+  globals: {
+    TZ: 'UTC',
+  },
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',

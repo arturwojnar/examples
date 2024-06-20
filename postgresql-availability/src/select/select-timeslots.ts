@@ -22,7 +22,10 @@ export class TimeSlot {
     public requesterId: string,
     public id?: number,
     public deleted = false,
-  ) {}
+  ) {
+    this.startTime = new Date(startTime)
+    this.endTime = new Date(endTime)
+  }
 
   isOverlapping(from: Date, to: Date): boolean {
     // Check if there is any overlap between [from, to] and the time slot
@@ -33,15 +36,26 @@ export class TimeSlot {
     return this.requesterId === requesterId
   }
 
-  getData() {
+  toJSON() {
     return {
-      startTime: this.startTime,
-      endTime: this.endTime,
+      startTime: new Date(this.startTime),
+      endTime: new Date(this.endTime),
       resourceId: this.resourceId,
       requesterId: this.requesterId,
       id: this.id,
       deleted: this.deleted,
     }
+  }
+
+  static fromDatabase(row: TimeSlot): TimeSlot {
+    return new TimeSlot(
+      row.resourceId,
+      dayjs(row.startTime).add(-new Date().getTimezoneOffset(), 'minutes').toDate(), // Ensure this is interpreted as UTC
+      dayjs(new Date(row.endTime)).add(-new Date().getTimezoneOffset(), 'minutes').toDate(), // Ensure this is interpreted as UTC
+      row.requesterId,
+      row.id,
+      row.deleted,
+    )
   }
 }
 
@@ -49,10 +63,7 @@ export class TimeSlot {
 export class TimeSlotRepository {
   private _sql: postgres.Sql<Record<string, postgres.PostgresType>>
 
-  constructor(
-    private _prisma = prisma,
-    private _port: number,
-  ) {
+  constructor(private _port: number) {
     this._sql = postgres({
       host: 'localhost',
       port: this._port,
@@ -62,57 +73,63 @@ export class TimeSlotRepository {
     })
   }
 
-  async create({ requesterId, resourceId, startTime: from, endTime: to }: TimeSlot) {
+  async lock({ requesterId, resourceId, startTime: from, endTime: to }: TimeSlot) {
     await this._sql.begin(async (sql) => {
-      await sql.unsafe(`
-        DO $$
-        DECLARE
-          v_count INTEGER;
-        BEGIN
-          SELECT 1 AS "count"
-          INTO v_count
-          FROM "TimeSlot2" t
-          WHERE "t"."resourceId"=${resourceId}
-            AND "t"."startTime" < '${to.toISOString()}'
-            AND "t"."endTime" > '${from.toISOString()}'
-            AND "t"."deleted"=False
-          LIMIT 1
-          FOR UPDATE;
-        
-          IF FOUND THEN
-            RAISE EXCEPTION 'CONFLICT on ${from.toISOString()}-${to.toISOString()} (${resourceId})';
-          END IF;
-        
-          INSERT INTO "TimeSlot2" ("requesterId", "resourceId", "startTime", "endTime", "deleted")
-          VALUES ('${requesterId}', ${resourceId}, '${from.toISOString()}', '${to.toISOString()}', False);
+      await sql`
+        SELECT upsert_select_reservation(
+          ${requesterId},
+          ${resourceId},
+          ${from.toISOString()}::timestamptz,
+          ${to.toISOString()}::timestamptz
+        );
+      `
+      // await sql.unsafe(`
+      //   DO $$
+      //   DECLARE
+      //     v_count INTEGER;
+      //   BEGIN
+      //     SELECT 1 AS "count"
+      //     INTO v_count
+      //     FROM "TimeSlot2" t
+      //     WHERE "t"."resourceId"=${resourceId}
+      //       AND "t"."startTime" < '${to.toISOString()}'
+      //       AND "t"."endTime" > '${from.toISOString()}'
+      //       AND "t"."deleted"=False
+      //     LIMIT 1
+      //     FOR UPDATE;
 
-        END $$;
-      `)
+      //     IF FOUND THEN
+      //       RAISE EXCEPTION 'CONFLICT on ${from.toISOString()}-${to.toISOString()} (${resourceId})';
+      //     END IF;
+
+      //     INSERT INTO "TimeSlot2" ("requesterId", "resourceId", "startTime", "endTime", "deleted")
+      //     VALUES ('${requesterId}', ${resourceId}, '${from.toISOString()}'::timestamptz, '${to.toISOString()}'::timestamptz, False);
+
+      //   END $$;
+      // `)
     })
   }
 
   async find(resourceId: number): Promise<TimeSlot[]> {
-    const prismaTimeSlots = await this._prisma.timeSlot2.findMany({
-      where: { resourceId },
-    })
-    return prismaTimeSlots.map(
-      (slot) => new TimeSlot(slot.resourceId, slot.startTime, slot.endTime, slot.requesterId, slot.id, slot.deleted),
-    )
+    const results: TimeSlot[] = await this._sql.unsafe(`select * from "TimeSlot2" where "resourceId"=${resourceId}`)
+
+    return results.map(TimeSlot.fromDatabase)
   }
 
   async unlock(resourceId: number, requesterId: string, startTime?: Date, endTime?: Date) {
-    const result = await this._prisma.timeSlot2.updateMany({
-      where: {
-        requesterId,
-        resourceId,
-        ...(startTime && endTime ? { startTime: { gte: startTime }, endTime: { lte: endTime } } : {}),
-      },
-      data: {
-        deleted: true,
-      },
-    })
-
-    return result
+    try {
+      const result = await this._sql`
+        UPDATE "TimeSlot2"
+        SET "deleted" = true
+        WHERE "requesterId" = ${requesterId}
+        AND "resourceId" = ${resourceId}
+        ${startTime && endTime ? this._sql`AND "startTime"=${startTime.toISOString()} AND "endTime"=${endTime.toISOString()}` : this._sql``}
+      `
+      return result.count
+    } catch (error) {
+      console.error('Error unlocking timeslot:', error)
+      throw error
+    }
   }
 }
 

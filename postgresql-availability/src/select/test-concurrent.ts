@@ -1,17 +1,16 @@
 import dayjs from 'dayjs'
 // import { avg } from '../utils'
+import { TimeAvailability, TimeSlotRepository } from './select-timeslots.js'
 import { PrismaClient } from '@prisma/client'
-import { TimeSlot, TimeSlotRepository } from './gist-timeslots.js'
 import { max } from 'mathjs'
 
 const requesterId = `artur`
 const requesterId2 = `sabina`
-const prisma = new PrismaClient()
-const repo = new TimeSlotRepository(prisma, 5432)
+const repo = new TimeSlotRepository(5432)
 export const avg = (values: Array<number>) => values.reduce((value, sum) => value + sum, 0) / values.length
 
-export const testInsertConcurrently = async (startDate: Date): Promise<[number, number]> => {
-  const tests = 10000
+export const testConcurrent = async (startDate: Date): Promise<number> => {
+  const tests = 1e6
   const promises1 = new Array<Promise<number>>(tests)
   const results1 = new Array<number>(tests)
 
@@ -31,7 +30,9 @@ export const testInsertConcurrently = async (startDate: Date): Promise<[number, 
 
   await p1
 
-  return [avg(results1), 0]
+  console.log(`the max is ${max(results1)}`)
+
+  return avg(results1)
 }
 
 export const testUnlockingConcurrently = async (startDate: Date): Promise<number> => {
@@ -45,13 +46,13 @@ export const testUnlockingConcurrently = async (startDate: Date): Promise<number
         .add(i * 30, 'days')
         .toDate()
 
-      for (let resourceId = 0; resourceId < 100; resourceId++) {
+      for (let resourceId = 10000; resourceId < 10000 + 100; resourceId++) {
         const from = dayjs(start)
         const to = dayjs(start).add(30, 'hours')
 
         promises1[i + resourceId] = (async (): Promise<number> => {
           const start = performance.now()
-          await repo.unlock(requesterId, resourceId, from.toDate(), to.toDate())
+          await repo.unlock(resourceId, requesterId, from.toDate(), to.toDate())
           return performance.now() - start
         })().then((time) => {
           results1[i + resourceId] = time
@@ -65,19 +66,21 @@ export const testUnlockingConcurrently = async (startDate: Date): Promise<number
 
   await p1
 
-  // console.log(max(...results1))
+  console.log(max(...results1))
 
   return avg(results1)
 }
 
 export const saveAvailability = async (from: Date, to: Date, requesterId: string, resourceId = 100) => {
   const start = performance.now()
-  await repo.create(new TimeSlot([from, to], resourceId, requesterId))
+  const availability = new TimeAvailability(resourceId)
+  const aggregate = await availability.lock(requesterId, from, to)
+  await repo.lock(aggregate)
   return performance.now() - start
 }
 
 export const removeAvailability = async (resourceId: number, requesterId: string, startTime: Date, endTime: Date) => {
   const start = performance.now()
-  await repo.unlock(requesterId, resourceId, startTime, endTime)
+  await repo.unlock(resourceId, requesterId, startTime, endTime)
   return performance.now() - start
 }

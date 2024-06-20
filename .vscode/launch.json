@@ -25,6 +25,15 @@
       "runtimeArgs": ["--experimental-modules"]
     },
     {
+      "type": "node",
+      "request": "launch",
+      "name": "test",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--experimental-vm-modules",
+        "${workspaceRoot}/postgresql-availability/node_modules/.bin/jest"
+      ],
+      "cwd": "${workspaceFolder}",
       "args": [
         "-c",
         "${workspaceFolder}/postgresql-availability/jest.config.js",
@@ -34,13 +43,7 @@
         "--colors",
         "--verbose"
       ],
-      "internalConsoleOptions": "neverOpen",
-      "console": "integratedTerminal",
-      "name": "test",
-      "program": "${workspaceRoot}/postgresql-availability/node_modules/.bin/jest",
-      "request": "launch",
-      "skipFiles": ["<node_internals>/**"],
-      "type": "node"
+      "internalConsoleOptions": "openOnSessionStart"
     }
   ]
 }
